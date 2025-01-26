@@ -1,5 +1,4 @@
 from service_watcher import ServiceWatcher
-from zmq import Poller
 from service_announcement import ServiceAnnouncement
 from loguru import logger
 from socket import gethostname, gethostbyname

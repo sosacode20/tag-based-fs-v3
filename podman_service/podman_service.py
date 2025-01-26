@@ -52,5 +52,17 @@ def create_discovery_test_node():
     print(f"Container {container.name} created")
 
 
+@app.command()
+def create_async_server_example():
+    # TODO: Implement
+    pass
+
+
+@app.command()
+def create_async_client_example(file_name: str, to_ip: str, to_port: int):
+    # TODO: Implement
+    pass
+
+
 if __name__ == "__main__":
     app()

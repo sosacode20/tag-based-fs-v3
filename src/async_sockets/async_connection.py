@@ -1,7 +1,8 @@
+from basic_imports import *
 import socket
 import asyncio
 from rich import print
-from frame_utils import (
+from .frame_utils import (
     Frame,
     FrameFlags,
     frames_from_multipart_message,

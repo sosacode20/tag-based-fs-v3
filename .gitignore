@@ -2,3 +2,7 @@
 **/.mypy_cache/
 **/__pycache__/
 experiments/
+*.pdf
+*.png
+*.jpg
+*.jpeg
