@@ -11,8 +11,8 @@ from loguru import logger
 from typing import Any
 import math
 from pathlib import Path
-from file_helper import FileHelper, FileMetadata
-from file_download_helper import FileDownloadHelper, DownloadMetadata
+from file_helpers.file_helper import FileHelper
+from file_helpers.file_download_helper import FileDownloadHelper
 from enum import Enum, unique
 from abc import ABC
 
