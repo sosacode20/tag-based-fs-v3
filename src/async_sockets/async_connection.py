@@ -74,6 +74,8 @@ class FailureOptions(Enum):
 
 
 class AsyncConnection:
+    """This class represents an async connection with another peer"""
+
     def __init__(
         self,
         connection_socket: socket.socket,

@@ -19,7 +19,7 @@ def get_data_base_folder() -> Path:
     folder_path = os.getenv("DATA_FOLDER")
     if folder_path:
         return Path(folder_path)
-    return Path(__file__).parent[1]
+    return Path(__file__).parents[2] / "data"
 
 
 app = App(name="Simple CLI for sending files")
@@ -58,6 +58,8 @@ async def send_file(to_ip: str, to_port: int, file_name: str, timeout=500):
         client: AsyncConnection = await create_client(to_ip=to_ip, to_port=to_port)
         file_helper: FileHelper = FileHelper(file_path=file_path)
         file_metadata: FileMetadata = file_helper.get_metadata()
+
+        # await client.send_multipart([b""])
 
         log.info(f"Sending the headers of the file to upload")
         await client.send_multipart(

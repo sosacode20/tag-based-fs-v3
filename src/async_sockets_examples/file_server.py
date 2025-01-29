@@ -18,7 +18,7 @@ def get_data_base_folder() -> Path:
     folder_path = os.getenv("DATA_FOLDER")
     if folder_path:
         return Path(folder_path)
-    return Path(__file__).parent[1] / "data"
+    return Path(__file__).parents[2] / "data"
 
 
 app = App("A CLI app for creating a file server")
@@ -94,6 +94,8 @@ async def handle_client(connection: AsyncConnection):
     log = my_logger.bind(inside="handle_client", connection=connection)
     log.info("Waiting for message")
     try:
+        # empty = await asyncio.wait_for(connection.recv_multipart(), timeout=5)
+        # log.info(f"Received the 'empty message' => {empty}")
         client_message = await asyncio.wait_for(connection.recv_multipart(), timeout=20)
         assert len(client_message) == 2, "The client message MUST have 2 parts"
         operation, _ = client_message
