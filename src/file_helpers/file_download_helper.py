@@ -89,8 +89,7 @@ class FileDownloadHelper:
 
     async def initialize(self):
         """Creates the .part file if not exists"""
-        if self.file_path.exists():
-            return
+        self.file_path.parent.mkdir(parents=True, exist_ok=True)
         self.file_path.touch()
         await self.append_metadata()
 
@@ -205,6 +204,7 @@ class FileDownloadHelper:
         """Save the downloaded file if its completed, to the destination_folder"""
         # if not await self.is_download_correct():
         #     return False
+        destination_folder.mkdir(parents=True, exist_ok=True)
         if not destination_folder.is_dir():
             raise Exception(
                 f"The destination_folder '{destination_folder}' NEEDS to be a folder"

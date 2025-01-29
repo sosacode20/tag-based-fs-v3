@@ -10,9 +10,21 @@ from file_helpers.file_helper import FileHelper, FileMetadata
 
 # from file_helpers.file_download_helper import DownloadMetadata, FileDownloadHelper
 from service_discovery.service_watcher import ServiceWatcher
+import os
+from typing import Optional
+
+
+def get_data_base_folder() -> Path:
+    """Returns the Path where the data should be stored"""
+    folder_path = os.getenv("DATA_FOLDER")
+    if folder_path:
+        return Path(folder_path)
+    return Path(__file__).parent[1]
+
 
 app = App(name="Simple CLI for sending files")
-files_directory = Path(__file__).parent / "files_to_send"
+data_base_folder = get_data_base_folder()
+files_directory = data_base_folder / "files_to_send"
 my_logger = logger.bind(where="async_client.py")
 
 discovery = ServiceWatcher()

@@ -10,11 +10,16 @@ import json
 from pathlib import Path
 from typing import Any
 import time
+import os
 
 
 def get_uri():
     """Returns the URI that allows the connection to podman service"""
     return "unix:///run/user/1000/podman/podman.sock"
+
+
+def get_user_group() -> int:
+    return os.getgid()
 
 
 def get_mounts(bindings: dict[str, str]) -> list[dict]:
@@ -23,11 +28,12 @@ def get_mounts(bindings: dict[str, str]) -> list[dict]:
     mounts = []
     default_mount = {
         "type": "bind",
-        # "source": "/home/leismael/Leismael/Projects/tag_based_volume_system",
-        # "target": "/app/data",
-        "read_only": False,
+        "readonly": False,
+        "bind-propagation": "rshared",
         # "relabel": "Z",
-        "relabel": "z",
+        # "relabel": "z",
+        "relabel": "shared",
+        # "idmap": True,
     }
     for container_path, host_path in bindings.items():
         mount = default_mount.copy()
@@ -45,6 +51,14 @@ def transform_bindings(bindings: list[tuple[Path, Path]]) -> list[dict[str, Any]
         "read_only": False,
         # "relabel": "Z",
         "relabel": "z",
+        # "chown": True,
+        # "relabel": "no",
+        "BindOptions": {
+            "Propagation": "rshared",
+            "NonRecursive": False,
+        },  # Propagación recursiva y compartida
+        # "mode": "rw",
+        # "security_opt":["label:disable"],  # Deshabilitar SELinux
     }
     for host_path, container_path in bindings:
         host_path.mkdir(parents=True, exist_ok=True)
@@ -149,6 +163,7 @@ def run_container(
     bindings: list[dict] = [],
     command: str = None,
     network: str = "podman",
+    environment: list[str] | dict[str, str] = [],
 ) -> Container:
     """Run a container with a given name and image name"""
     with PodmanClient(base_url=get_uri()) as client:
@@ -166,18 +181,21 @@ def run_container(
         # if networks == []:
         #     networks = ["my-network"]
         # network = get_network_by_name("my-network")
-
+        group_id = get_user_group()
         container = client.containers.run(
             name=container_name,
             image=image_name,
             detach=True,
             mounts=bindings,
             network_mode="bridge",
-            # network_mode="none",
+            environment=environment,
+            group_add=[str(group_id)],
             command=command,
             network=network,  # This works
             # networks=networks, # Doesn't work
             tty=True,
+            security_opt=["disable:True"],  # Deshabilitar SELinux
+            userns_mode="keep-id",  # This is the important line for allowing the write of files in non-root containers
         )
         # net = get_network_by_name(networks[0])
         # net.connect(container)
