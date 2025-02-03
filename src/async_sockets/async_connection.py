@@ -307,8 +307,9 @@ class AsyncConnection:
         )
         log.info(f"Starting the download of the file {file_download_helper.file_name}")
 
-        bytes_to_download = await file_download_helper.get_number_bytes_to_download()
-        downloaded_bytes = 0
+        meta = await file_download_helper.read_metadata()
+        bytes_to_download = meta.file_size - meta.downloaded_bytes
+        downloaded_bytes = meta.downloaded_bytes
         while bytes_to_download - downloaded_bytes:
             to_download = min(max_chunk_size, bytes_to_download - downloaded_bytes)
             log.info(
@@ -359,7 +360,7 @@ class AsyncConnection:
                     log.info(
                         "Sending a message to the peer that we detect an unknown request from them"
                     )
-                    await asyncio.wait_for(self.recv_multipart(), timeout=timeout)
+                    await asyncio.wait_for(self.send_multipart([FileOperations.ERROR.value]), timeout=timeout)
                     log.info("Error message delivered successfully")
                     return False, FailureOptions.BAD_REQUEST
 

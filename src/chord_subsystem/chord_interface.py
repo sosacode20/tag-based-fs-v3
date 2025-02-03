@@ -29,7 +29,7 @@ def in_between(id: int, start: int, end: int) -> bool:
     return start < id or id <= end
 
 
-CHORD_SUBSYSTEM = b"Chord"
+CHORD_SUBSYSTEM = b"CHORD"
 """This is for identifying the subsystem"""
 
 
@@ -54,9 +54,9 @@ class OperationCodes(Enum):
     FIND_SUCCESSOR = b"Find_S"
     FIND_PREDECESSOR = b"Find_P"
     GET_SUCCESSORS = b"Get_Successors"
+    GET_PREDECESSORS = b"Get_Predecessors"
     GET_SUC = b"GET_SUC"
     GET_PRED = b"GET_PRED"
-    GET_PREDECESSORS = b"Get_Predecessors"
     NOTIFY = b"Notify"
     PING = b"Ping"
     CLOSEST_PRECEDING_FINGER = b"Closest_PF"
@@ -187,18 +187,18 @@ class ChordInterface(ABC):
 
     @property
     @abstractmethod
-    async def successor(self) -> ChordResponse[Self]:
+    async def successor(self) -> Optional[Self]:
         """Gets the successor node."""
         pass
 
     @property
     @abstractmethod
-    async def predecessor(self) -> ChordResponse[Self]:
+    async def predecessor(self) -> Optional[Self]:
         """Gets the predecessor node."""
         pass
 
     @abstractmethod
-    async def get_successors(self, length: int) -> ChordResponse[list[Self]]:
+    async def get_successors(self, length: int) -> Optional[list[Self]]:
         """Get at most `length` successors of this node
 
         NOTE: The node MUST not give you it's last successor
@@ -206,7 +206,7 @@ class ChordInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_predecessors(self, length: int) -> ChordResponse[list[Self]]:
+    async def get_predecessors(self, length: int) -> Optional[list[Self]]:
         """Get at most `length` predecessors of this node
 
         NOTE: The node MUST not give you it's last successor
@@ -214,22 +214,22 @@ class ChordInterface(ABC):
         pass
 
     @abstractmethod
-    async def find_successor(self, id: int) -> ChordResponse[Self]:
+    async def find_successor(self, id: int) -> Optional[Self]:
         """Finds the `ChordNode` of the immediate successor of the `id`"""
         pass
 
     @abstractmethod
-    async def find_predecessor(self, id: int) -> ChordResponse[Self]:
+    async def find_predecessor(self, id: int) -> Optional[Self]:
         """Finds the `ChordNode` of the immediate predecessor of the `id`"""
         pass
 
     @abstractmethod
-    async def closest_preceding_finger(self, id: int) -> ChordResponse[Self]:
+    async def closest_preceding_finger(self, id: int) -> Optional[Self]:
         """Find the closest preceding finger preceding the `id`"""
         pass
 
     @abstractmethod
-    async def notify(self, node: Self) -> ChordResponse:
+    async def notify(self, node: Self) -> None:
         """This function notify this node about another node that is potentially it's predecessor"""
         pass
 

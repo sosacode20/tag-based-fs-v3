@@ -7,6 +7,7 @@ from loguru import logger
 from .discovery_agent import DiscoveryAgent, JOINED, LEFT, KILL
 import uuid
 from threading import Thread
+from typing import Optional
 
 
 def create_pipe(ctx: zmq.Context) -> tuple[zmq.Socket, zmq.Socket]:
@@ -110,6 +111,10 @@ class ServiceWatcher(object):
                     f"An unexpected error has occurred inside the 'Updater' -> {e}"
                 )
 
-    def get_services(self, service_name: str, max_amount: int) -> list[Peer]:
+    def get_services(
+        self,
+        service_name: str,
+        max_amount: Optional[int] = None,
+    ) -> list[Peer]:
         """Get the services from the registry"""
         return self.peer_registry.get_peers(service_name, max_amount)

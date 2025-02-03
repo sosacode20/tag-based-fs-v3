@@ -31,7 +31,7 @@ class Frame:
         self.size: bytes = 0b00000000
         """The size of the frame"""
         size_field = math.ceil(
-            math.log2(max(len(self.data_body, 1)))
+            math.log2(max(len(self.data_body), 1))
         )  # The byte size of the size field
         if size_field <= 8:  # If the size field can be represented in a single byte
             self.size: bytes = len(self.data_body).to_bytes(length=1, byteorder="big")

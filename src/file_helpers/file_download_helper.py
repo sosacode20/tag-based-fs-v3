@@ -114,7 +114,7 @@ class FileDownloadHelper:
             await file.seek(-metadata_size, os.SEEK_END)
             metadata = await file.read(metadata_size)
             metadata = DownloadMetadata.from_bytes(metadata_in_bytes=metadata)
-            return metadata
+        return metadata
 
     async def read_metadata(self) -> DownloadMetadata:
         self.metadata = await FileDownloadHelper._read_metadata(self.file_path)
@@ -152,6 +152,13 @@ class FileDownloadHelper:
         an associated metadata"""
         self.metadata = await self.read_metadata()
         return self.metadata.file_size - self.metadata.downloaded_bytes
+
+    async def get_number_bytes_downloaded(self) -> int:
+        """
+        Returns the number of downloaded bytes
+        """
+        self.metadata = await self.read_metadata()
+        return self.metadata.downloaded_bytes
 
     async def write_chunk(self, chunk: bytes):
         if not self.file_path.exists():

@@ -64,9 +64,9 @@ class PeerRegistry(BaseModel):
     """The dictionary of services and the peers that offered it"""
     max_peers_per_service: int = Field(
         gt=0,
-        lt=50,
+        lt=1000,
         description="The maximum number of peers per service",
-        default=10,
+        default=500,
     )
     """The maximum number of peers per service"""
 
@@ -112,7 +112,7 @@ class PeerRegistry(BaseModel):
             log.error(f"Error trying to remove a peer that doesn't exist: {e}")
             raise e
 
-    def get_peers(self, service_name: str, max_amount: int) -> list[Peer]:
+    def get_peers(self, service_name: str, max_amount: Optional[int]) -> list[Peer]:
         """Get a list of the most recent joined peers from the registry"""
         log = logger.bind(
             where=self.__class__.__name__,
@@ -123,7 +123,8 @@ class PeerRegistry(BaseModel):
         result = self.services_and_peers.get(service_name, [])
         log.info("Getting the list of peers")
         log.bind(peers=result).debug("List of peers before the execution of the method")
-        result = result[-max_amount:]
+        if max_amount:
+            result = result[-max_amount:]
         log.bind(peers=result).debug("List of peers after the execution of the method")
         return result
 

@@ -173,5 +173,47 @@ def create_async_client_example(
     print(f"Container {container.name} created")
 
 
+@app.command()
+def create_storage_server():
+    """Creates the server for the tag based filesystem"""
+    image_name = "distributed_python:basic"
+    base_path = get_base_path()
+    id = uuid.uuid4().hex
+    container_name: str = f"storage_server_{id}"
+    bindings = [
+        *get_basic_bindings(),
+        (
+            get_data_folder(container_name),
+            Path("/app/data"),
+        ),
+        (
+            base_path / "chord_subsystem",
+            Path("/app/code") / "chord_subsystem",
+        ),
+        (
+            base_path / "server",
+            Path("/app/code") / "server",
+        ),
+    ]
+    bindings = transform_bindings(bindings)
+    env_vars = {
+        "DATA_FOLDER": "/app/data",
+    }
+    container = run_container(
+        container_name=container_name,
+        image_name=image_name,
+        bindings=bindings,
+        network="servers",
+        environment=env_vars,
+        command=[
+            "python",
+            "/app/code/server/server_service.py",
+            "start-server",
+        ],
+        # command=["python", "./code/main.py"],
+    )
+    print(f"Container {container.name} created")
+
+
 if __name__ == "__main__":
     app()

@@ -85,6 +85,7 @@ async def send_file(to_ip: str, to_port: int, file_name: str, timeout=500):
         log.info("Connection closed")
     except Exception as e:
         log.error(f"An unknown exception occur =>\n{repr(e)}")
+        log.error(f"{e.with_traceback()}")
     finally:
         log.info("Closing connection with server")
         client.close_connection()

@@ -9,6 +9,16 @@ from file_helpers.file_helper import FileMetadata, FileHelper
 import os
 from service_discovery.service_watcher import ServiceWatcher, ServiceAnnouncement
 from socket import gethostbyname, gethostname
+from server_constants import SERVER_SERVICE_NAME, Subsystems
+from async_sockets.async_server import AsyncServer, AsyncConnection
+from chord_subsystem.chord_node import ChordNode, CHORD_SERVICE_NAME, CHORD_SUBSYSTEM
+import asyncio
+import zmq
+from zmq.asyncio import Poller
+from typing import Optional, Any
+
+FROM_CLIENT = b"CLIENT"
+"""The tag to indicate that the message is from a client"""
 
 
 def get_data_base_folder() -> Path:
@@ -22,29 +32,45 @@ def get_data_base_folder() -> Path:
 def get_default_filter() -> LogFilters:
     filter = LogFilters()
     filter.add_filter(
-        where="tag_file_server", inside=[]
-    )  # TODO: Fill the `inside` list
+        where="ChordNode",
+        inside=[
+            "where_to_join",
+            "join",
+            # "stabilize",
+            "notify",
+            # "fix_fingers",
+            # "check_predecessor",
+            # "find_successor",
+            # "find_predecessor",
+            # "closest_preceding_finger",
+        ],
+    )
+    filter.add_filter(
+        where="server_service.py",
+        inside=[
+            "handle_client",
+            "start_server",
+        ],
+    )
+    filter.add_filter(
+        where="ChordNodeReference",
+        inside=[
+            "send_data",
+        ],
+    )
     return filter
 
 
-def get_ip():
-    return
-
-
-def get_service_watcher() -> ServiceWatcher:
+def get_service_watcher(our_port: int) -> ServiceWatcher:
     return ServiceWatcher(
         services_to_announce=[
             ServiceAnnouncement(
-                service="file.storage.server",
+                service=SERVER_SERVICE_NAME,
                 ip=gethostbyname(gethostname()),
-                port=5000,
+                port=our_port,
             )
         ]
     )
-
-
-def start_server():
-    pass
 
 
 default_filter = get_default_filter()
@@ -61,5 +87,82 @@ logger.add(
     # compression="zip",
     serialize=True,
 )
-my_logger = logger.bind(where="file_server.py")
-watcher = get_service_watcher()
+my_logger = logger.bind(where="server_service.py")
+zmq_context = zmq.SyncContext.instance()
+
+
+async def handle_client(
+    connection: AsyncConnection,
+    chord_subsystem: ChordNode,
+):
+    log = my_logger.bind(inside="handle_client")
+    log.info(f"Handling the client with address => {connection.address}")
+    try:
+        request = await connection.recv_multipart()
+        # NOTE: All request MUST be of the form [FROM, TO, *REST_REQUEST]
+        match request:
+            case b"PING",:
+                log.info("The request is a PING")
+                await connection.send_multipart([b"PONG"])
+            case _, CHORD_SUBSYSTEM, *rest:
+                log.info("The request is for the Chord subsystem")
+                response = await chord_subsystem.handle_request(rest)
+                if response:
+                    await connection.send_multipart(response)
+            case _, Subsystems.FILES.value, *rest:
+                if not chord_subsystem.is_ready():
+                    log.error("The Chord subsystem is not ready")
+                    await connection.send_multipart([b"NOT_READY"])
+                    return
+                log.info("The request is for the Files subsystem")
+            case _, Subsystems.TAGS.value, *rest:
+                log.info("The request is for the Tags subsystem")
+                if not chord_subsystem.is_ready():
+                    log.error("The Chord subsystem is not ready")
+                    await connection.send_multipart([b"NOT_READY"])
+                    return
+            case _:
+                log.warning("The request is not for any subsystem")
+        return
+    except BaseException as e:
+        log.exception(f"Error while handling the client:\n{e.with_traceback()}")
+    finally:
+        if connection:
+            connection.close_connection()
+
+
+@app.command()
+async def start_server(port: int = 5700):
+    """This function starts the server service"""
+    log = my_logger.bind(inside="start_server")
+    log.info("Starting the service watcher")
+    watcher = get_service_watcher(our_port=port)
+    ip = gethostbyname(gethostname())
+
+    log.info("Creating the Chord Node")
+    chord_sub = ChordNode(
+        ip=ip,
+        port=port,
+        watcher=watcher,
+    )
+    asyncio.create_task(chord_sub.run())
+
+    await asyncio.sleep(3)
+    log.info("Chord Node created")
+
+    log.info(f"Creating the server at => tcp://{ip}:{port}")
+    server = AsyncServer(
+        ip=ip,
+        port=port,
+        handle_client_connection=lambda conn: handle_client(
+            connection=conn,
+            chord_subsystem=chord_sub,
+        ),
+        max_connections=300,
+    )
+    log.info("Server created")
+    await server.run_server()
+
+
+if __name__ == "__main__":
+    app()
