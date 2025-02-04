@@ -34,15 +34,16 @@ def get_default_filter() -> LogFilters:
     filter.add_filter(
         where="ChordNode",
         inside=[
-            "where_to_join",
+            # "where_to_join",
             "join",
-            # "stabilize",
-            "notify",
+            "stabilize",
+            # "notify",
             # "fix_fingers",
-            # "check_predecessor",
+            "check_predecessor",
             # "find_successor",
             # "find_predecessor",
             # "closest_preceding_finger",
+            "handle_request",
         ],
     )
     filter.add_filter(
@@ -53,9 +54,19 @@ def get_default_filter() -> LogFilters:
         ],
     )
     filter.add_filter(
-        where="ChordNodeReference",
+        where="SuccessorList",
         inside=[
-            "send_data",
+            "add",
+            "get_successor",
+            "get_pred_and_successors",
+            "get_first_alive_successor",
+            "update",
+        ],
+    )
+    filter.add_filter(
+        where="FileServerSubsystem",
+        inside=[
+            "handle_request",
         ],
     )
     return filter
@@ -77,7 +88,15 @@ default_filter = get_default_filter()
 data_path = get_data_base_folder()
 app = App("A CLI app for creating a file server")
 logger.remove()
-logger.add(sys.stdout, filter=default_filter, colorize=True, backtrace=True)
+logger.add(
+    sys.stdout,
+    filter=default_filter,
+    # format=custom_log_format,
+    colorize=True,
+    backtrace=True,
+    catch=True,
+    diagnose=True,
+)
 logger.add(
     data_path / "logs" / "server_only.log",
     filter=default_filter,

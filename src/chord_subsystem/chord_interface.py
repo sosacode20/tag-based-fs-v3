@@ -152,10 +152,10 @@ class ChordInterface(ABC):
         return [chord_data.to_json().encode()]
 
     def __str__(self):
-        return f"ChordNode({self.ip}:{self.port})"
+        return f"ChordNode({self.ip}:{self.port}, id={self.id})"
 
     def __repr__(self):
-        return f"ChordNode({self.ip}:{self.port})"
+        return f"ChordNode({self.ip}:{self.port}, id={self.id})"
 
     def __gt__(self, other):
         if isinstance(other, ChordInterface):
@@ -184,6 +184,23 @@ class ChordInterface(ABC):
         raise Exception(
             "Trying to compare a ChordInterface with an object that is not of the correct type"
         )
+
+    def __eq__(self, value):
+        if isinstance(value, ChordInterface):
+            return self.id == value.id
+        raise Exception(
+            "Trying to compare a ChordInterface with an object that is not of the correct type"
+        )
+
+    def __ne__(self, value):
+        if isinstance(value, ChordInterface):
+            return self.id != value.id
+        raise Exception(
+            "Trying to compare a ChordInterface with an object that is not of the correct type"
+        )
+
+    def __hash__(self):
+        return self.id
 
     @property
     @abstractmethod
@@ -229,7 +246,7 @@ class ChordInterface(ABC):
         pass
 
     @abstractmethod
-    async def notify(self, node: Self) -> None:
+    async def notify(self, node: Self) -> bool:
         """This function notify this node about another node that is potentially it's predecessor"""
         pass
 

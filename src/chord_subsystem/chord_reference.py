@@ -42,7 +42,7 @@ class ChordNodeReference(ChordInterface):
     def from_json(json_data: str | bytes) -> "ChordNodeReference":
         """Returns an instance of the ChordReference class given the information as json data"""
         chord_data = ChordData.from_json(json_data)
-        return ChordNodeReference(ip=chord_data.ip, port=chord_data.port)
+        return ChordNodeReference(ip=str(chord_data.ip), port=chord_data.port)
 
     async def send_data(
         self,
@@ -54,10 +54,17 @@ class ChordNodeReference(ChordInterface):
         log.info(f"Trying to send data => {data}")
         timeout = self.timeout if not timeout else timeout
         response: Optional[list[bytes]] = None
+
         try:
             log.debug(f"Trying to connect to => tcp://{self.ip}:{self.port}")
             client = await create_client(self.ip, self.port, my_logger=log)
             log.debug("Connection created")
+        except Exception as e:
+            log.error(
+                f"Unable to connect to => tcp://{self.ip}:{self.port}. Error => {e}"
+            )
+            return None
+        try:
             # NOTE: Messages MUST be of the form [FROM, TO] + data
             message = [CHORD_SUBSYSTEM, CHORD_SUBSYSTEM] + data
             # log.bind(message).debug("Sending the message")
@@ -86,8 +93,7 @@ class ChordNodeReference(ChordInterface):
             log.error(f"An unknown exception occur =>\n{repr(e)}")
         finally:
             log.info("Closing connection with server")
-            if client:
-                client.close_connection()
+            client.close_connection()
             log.info("Connection closed")
             return response
 
@@ -107,7 +113,7 @@ class ChordNodeReference(ChordInterface):
                 len(response) == 1
             ), "The response when asking for successors has more than 1 element in the multipart message"
             node = ChordData.from_json(response[0])
-            return ChordNodeReference(node.ip, node.port, timeout=self.timeout)
+            return ChordNodeReference(str(node.ip), node.port, timeout=self.timeout)
         return None
 
     @property
@@ -126,7 +132,7 @@ class ChordNodeReference(ChordInterface):
                 len(response) == 1
             ), "The response when asking for successors has more than 1 element in the multipart message"
             node = ChordData.from_json(response[0])
-            return ChordNodeReference(node.ip, node.port, timeout=self.timeout)
+            return ChordNodeReference(str(node.ip), node.port, timeout=self.timeout)
         return None
 
     # async def get_successors(self, length: int) -> Optional[list[ChordInterface]]:
@@ -147,7 +153,7 @@ class ChordNodeReference(ChordInterface):
             nodes_data = ChordDataList.from_json(response[0])
             nodes = list(
                 map(
-                    lambda el: ChordNodeReference(el.ip, el.port, self.timeout),
+                    lambda el: ChordNodeReference(str(el.ip), el.port, self.timeout),
                     nodes_data.nodes,
                 )
             )
@@ -171,7 +177,7 @@ class ChordNodeReference(ChordInterface):
             nodes_data = ChordDataList.from_json(response[0])
             nodes = list(
                 map(
-                    lambda el: ChordNodeReference(el.ip, el.port, self.timeout),
+                    lambda el: ChordNodeReference(str(el.ip), el.port, self.timeout),
                     nodes_data.nodes,
                 )
             )
@@ -191,7 +197,7 @@ class ChordNodeReference(ChordInterface):
                 len(response) == 1
             ), "The response for finding a successor should be a multipart message of length 1"
             node = ChordData.from_json(response[0])
-            return ChordNodeReference(node.ip, node.port, self.timeout)
+            return ChordNodeReference(str(node.ip), node.port, self.timeout)
         return None
 
     async def find_predecessor(self, id: int) -> Optional[Self]:
@@ -207,7 +213,7 @@ class ChordNodeReference(ChordInterface):
                 len(response) == 1
             ), "The response for finding a predecessor should be a multipart message of length 1"
             node = ChordData.from_json(response[0])
-            return ChordNodeReference(node.ip, node.port, self.timeout)
+            return ChordNodeReference(str(node.ip), node.port, self.timeout)
         return None
 
     async def closest_preceding_finger(self, id: int) -> Optional[Self]:
@@ -223,7 +229,7 @@ class ChordNodeReference(ChordInterface):
                 len(response) == 1
             ), "The response for finding the closest preceding finger should be a multipart message of length 1"
             node = ChordData.from_json(response[0])
-            return ChordNodeReference(node.ip, node.port, self.timeout)
+            return ChordNodeReference(str(node.ip), node.port, self.timeout)
         return None
 
     async def notify(self, node: ChordInterface):
@@ -232,10 +238,11 @@ class ChordNodeReference(ChordInterface):
 
         operation = OperationCodes.NOTIFY.value
         log.debug("Waiting for a response of the node")
-        await self.send_data(
+        response = await self.send_data(
             data=[operation, *node.to_multipart_message()],
-            expect_response=False,
+            # expect_response=False,
         )
+        return response != None
 
     async def ping(self) -> bool:
         log = self.logger.bind(inside="ping")

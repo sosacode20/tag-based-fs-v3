@@ -21,7 +21,17 @@ def get_data_path() -> Path:
 
 def get_default_log_filter() -> LogFilters:
     filter = LogFilters()
-    filter.add_filter(where="cli_app", inside=[""])
+    filter.add_filter(
+        where="cli_app",
+        inside=[
+            "add_files",
+            "delete_files",
+            "list_files",
+            "download_files",
+            "add_tags",
+            "delete_tags",
+        ],
+    )
     return filter
 
 
@@ -49,7 +59,7 @@ watcher = ServiceWatcher()
 
 
 @app.command()
-def send_files(
+async def add_files(
     file_names: Annotated[
         list[str],
         Parameter(
@@ -63,4 +73,77 @@ def send_files(
         ),
     ],
 ):
+    """Adds a list of files to the server with associated tags"""
+    pass
+
+
+async def delete_files(
+    tag_query: Annotated[
+        list[str],
+        Parameter(
+            consume_multiple=True,
+        ),
+    ]
+):
+    """Deletes files from the server based on the tags"""
+    pass
+
+
+async def list_files(
+    tag_query: Annotated[
+        list[str],
+        Parameter(
+            consume_multiple=True,
+        ),
+    ]
+):
+    """Lists files from the server based on the tags"""
+    pass
+
+
+async def download_files(
+    file_names: Annotated[
+        list[str],
+        Parameter(
+            consume_multiple=True,
+        ),
+    ]
+):
+    """Downloads files from the server based on the names of the files"""
+    pass
+
+
+async def add_tags(
+    tag_query: Annotated[
+        list[str],
+        Parameter(
+            consume_multiple=True,
+        ),
+    ],
+    tag_list: Annotated[
+        list[str],
+        Parameter(
+            consume_multiple=True,
+        ),
+    ],
+):
+    """Adds tags to files based on the tag query"""
+    pass
+
+
+async def delete_tags(
+    tag_query: Annotated[
+        list[str],
+        Parameter(
+            consume_multiple=True,
+        ),
+    ],
+    tag_list: Annotated[
+        list[str],
+        Parameter(
+            consume_multiple=True,
+        ),
+    ],
+):
+    """Deletes tags from files based on the tag query"""
     pass
