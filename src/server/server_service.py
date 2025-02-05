@@ -72,6 +72,8 @@ def get_default_filter() -> LogFilters:
         inside=[
             "handle_request",
             "handle_upload",
+            "successors_replication",
+            "replicate_files_with_successor",
         ],
     )
     filter.add_filter(
@@ -203,6 +205,8 @@ async def start_server(port: int = 5700):
         chord_node=chord_sub,
         storage_directory=data_path / "file_server",
     )
+
+    await file_server.start()
 
     tag_server = TagServerSubsystem(
         ip=ip,

@@ -6,6 +6,16 @@ from pathlib import Path
 import aiofiles
 
 
+def get_file_id(file_name: str) -> str:
+    """
+    Get the file id for the given file name
+
+    :param file_name: The name of the file
+    :return: The file id
+    """
+    return getShaRepr(file_name)
+
+
 class FileServerFilesMeta(BaseModel):
     files: list[FileMetadata] = []
     """The list of files that this server has"""
@@ -60,7 +70,8 @@ class FileServerFilesMeta(BaseModel):
         in_range: list[FileMetadata] = []
         out_range: list[FileMetadata] = []
         for file in self.files:
-            if in_between(file.file_id, range):
+            file_id = get_file_id(file.name)
+            if in_between(file_id, *range):
                 in_range.append(file)
             else:
                 out_range.append(file)

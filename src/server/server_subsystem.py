@@ -65,6 +65,10 @@ class FileServerSubsystem:
         self.my_files: FileServerFilesMeta = FileServerFilesMeta()
         """The list of files this server has"""
 
+    async def start(self):
+        """This method creates an infinite task for replicate data"""
+        asyncio.create_task(self.successors_replication())
+
     async def replicate_files_with_successor(
         self,
         ip: str,
