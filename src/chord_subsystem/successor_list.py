@@ -306,6 +306,11 @@ class PredecessorList:
         return self.list[:length]
 
     async def get_predecessor(self):
+        """Get the first predecessor of this node.
+
+        If no predecessor exists. It will return the primary node
+        (the one with the predecessors)
+        """
         log = self.logger.bind(inside="get_predecessor")
         log.info(f"Obtaining the first predecessor of this node {self.primary_node}")
         if len(self.list) == 0:

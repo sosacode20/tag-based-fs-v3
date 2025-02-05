@@ -1,19 +1,9 @@
-from basic_imports import *
 from enum import Enum, unique
 
+CLIENT_SYSTEM = b"CLIENT"
+"""The name of the client as an user of the file server"""
 SERVER_SERVICE_NAME: str = "file.storage.server"
 """The name of the server service for use in the service discovery"""
-NOT_READY: bytes = b"NOT_READY"
-"""A response that tells the system is not ready for processing requests"""
-
-
-class Subsystems(Enum):
-    CHORD = b"CHORD"
-    """The Chord Subsystem"""
-    FILES = b"FILES"
-    """The Files Subsystem"""
-    TAGS = b"TAGS"
-    """The Tags Subsystem"""
 
 
 class Commands(Enum):

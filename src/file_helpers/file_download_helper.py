@@ -90,6 +90,9 @@ class FileDownloadHelper:
     async def initialize(self):
         """Creates the .part file if not exists"""
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.file_path.exists():
+            # Delete file
+            self.file_path.unlink()
         self.file_path.touch()
         await self.append_metadata()
 

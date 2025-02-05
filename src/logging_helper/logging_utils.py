@@ -2,6 +2,10 @@ from basic_imports import *
 from loguru import logger
 from loguru import _logger
 from typing import Any, Union
+from datetime import timedelta
+from rich.text import Text
+from rich.console import Console, ConsoleDimensions
+import shutil
 
 
 class LogFilters:
@@ -29,6 +33,66 @@ class LogFilters:
             ):
                 return True
         return False
+
+
+# width, _ = shutil.get_terminal_size()
+console = Console()
+
+
+def print_log(elapsed_time: timedelta, level: str, log_info: tuple, message: str):
+    file_name, starting_point, function, line_number = log_info
+    log_info_str = f"{file_name}:{starting_point}:{function}:{line_number}"
+
+    # Crear los textos con colores
+    elapsed_time_text = Text(str(elapsed_time), style="bold blue")
+    level_text = Text(level, style="bold green")
+    log_info_text = Text(log_info_str, style="bold yellow")
+    message_text = Text(message, style="bold magenta")
+
+    # Combinar los textos con separadores
+    log_entry = Text.assemble(
+        elapsed_time_text,
+        " | ",
+        level_text,
+        " | ",
+        log_info_text,
+        " | ",
+        message_text,
+        no_wrap=True,
+    )
+
+    # Imprimir el log
+    # print(log_entry)
+    # dimensions = ConsoleDimensions()
+    # console = Console(width=dimensions.width)
+    console.print(log_entry, justify="left", end="\n\n")
+
+
+def print_message(message):
+    record = message.record
+    elapsed_time: timedelta = record["elapsed"]
+    level: str = record["level"].name
+    log_info: tuple = (
+        record["file"].name,
+        record["name"],
+        record["function"],
+        record["line"],
+    )
+    # console.print(str(message))
+    message: str = record["message"]
+    print_log(elapsed_time, level, log_info, message)
+
+
+def configure_logger():
+    """Remove the basic logger and give another initial one"""
+    logger.remove()
+    logger.add(
+        print_message,
+        # colorize=True,
+        # backtrace=True,
+        # diagnose=True,
+    )
+
 
 def custom_log_format(record):
     time_format = (

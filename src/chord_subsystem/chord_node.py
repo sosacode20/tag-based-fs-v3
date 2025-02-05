@@ -72,6 +72,13 @@ class ChordNode(ChordInterface):
             self.where_to_join(),
         )
 
+    async def get_range(self) -> tuple[int, int]:
+        """Returns the range of keys for which we are responsible for.
+
+        The range is of the form (start, end]"""
+        pred = await self.predecessor
+        return pred.id, self.id
+
     # region Chord RPC methods
 
     @property
@@ -126,28 +133,6 @@ class ChordNode(ChordInterface):
                 )
                 return None  # TODO: Check if this is the correct way to handle this
 
-            # closest = await node.closest_preceding_finger(id)
-            # log.debug(f"Closest preceding finger => {closest}")
-            # node = succ
-            # if closest is not None and closest != node:
-            #     alive = await closest.ping()
-            #     if alive:
-            #         log.debug(f"Closest preceding finger {closest} is alive")
-            #         node = closest
-            #     else:
-            #         log.debug(f"Closest preceding finger {closest} is not alive")
-            # else:
-            #     node = succ
-            # # WARNING: This can be a problem if the successor node is not alive
-            # log.debug(f"Asking for the successor of node = {node}")
-            # succ = await node.successor
-            # log.debug(f"Successor of node = {node} is {succ}")
-            # if succ is None:
-            #     log.warning(
-            #         f"Successor of node {node} is None. Exiting the loop. THE NODE IS DEAD"
-            #     )
-            #     break
-            # TODO: Finish
         log.info(f"Found the predecessor of {id} = {node}")
         return node
 

@@ -1,5 +1,5 @@
 from basic_imports import *
-from logging_helper.logging_utils import LogFilters, custom_log_format
+from logging_helper.logging_utils import LogFilters, custom_log_format, configure_logger
 from cyclopts import App, Parameter
 from loguru import logger
 from loguru._logger import Logger
@@ -9,9 +9,13 @@ from file_helpers.file_helper import FileMetadata, FileHelper
 import os
 from service_discovery.service_watcher import ServiceWatcher, ServiceAnnouncement
 from socket import gethostbyname, gethostname
-from server_constants import SERVER_SERVICE_NAME, Subsystems
+from server_constants import SERVER_SERVICE_NAME, Subsystems, NOT_READY
 from async_sockets.async_server import AsyncServer, AsyncConnection
 from chord_subsystem.chord_node import ChordNode, CHORD_SERVICE_NAME, CHORD_SUBSYSTEM
+from server_subsystem import FileServerSubsystem
+from tag_server_subsystem import TagServerSubsystem
+
+
 import asyncio
 import zmq
 from zmq.asyncio import Poller
@@ -35,38 +39,45 @@ def get_default_filter() -> LogFilters:
         where="ChordNode",
         inside=[
             # "where_to_join",
-            "join",
+            # "join",
             "stabilize",
             # "notify",
             # "fix_fingers",
-            "check_predecessor",
+            # "check_predecessor",
             # "find_successor",
             # "find_predecessor",
             # "closest_preceding_finger",
-            "handle_request",
+            # "handle_request",
         ],
     )
-    filter.add_filter(
-        where="server_service.py",
-        inside=[
-            "handle_client",
-            "start_server",
-        ],
-    )
-    filter.add_filter(
-        where="SuccessorList",
-        inside=[
-            "add",
-            "get_successor",
-            "get_pred_and_successors",
-            "get_first_alive_successor",
-            "update",
-        ],
-    )
+    # filter.add_filter(
+    #     where="server_service.py",
+    #     inside=[
+    #         "handle_client",
+    #         "start_server",
+    #     ],
+    # )
+    # filter.add_filter(
+    #     where="SuccessorList",
+    #     inside=[
+    #         "add",
+    #         "get_successor",
+    #         "get_pred_and_successors",
+    #         "get_first_alive_successor",
+    #         "update",
+    #     ],
+    # )
     filter.add_filter(
         where="FileServerSubsystem",
         inside=[
             "handle_request",
+            "handle_upload",
+        ],
+    )
+    filter.add_filter(
+        where="file_operations",
+        inside=[
+            "handle_file_upload_to_server",
         ],
     )
     return filter
@@ -97,6 +108,7 @@ logger.add(
     catch=True,
     diagnose=True,
 )
+# configure_logger()
 logger.add(
     data_path / "logs" / "server_only.log",
     filter=default_filter,
@@ -113,6 +125,8 @@ zmq_context = zmq.SyncContext.instance()
 async def handle_client(
     connection: AsyncConnection,
     chord_subsystem: ChordNode,
+    file_server: FileServerSubsystem,
+    tag_server: TagServerSubsystem,
 ):
     log = my_logger.bind(inside="handle_client")
     log.info(f"Handling the client with address => {connection.address}")
@@ -123,28 +137,43 @@ async def handle_client(
             case b"PING",:
                 log.info("The request is a PING")
                 await connection.send_multipart([b"PONG"])
-            case _, CHORD_SUBSYSTEM, *rest:
+            case _, Subsystems.CHORD.value, *rest:
                 log.info("The request is for the Chord subsystem")
                 response = await chord_subsystem.handle_request(rest)
                 if response:
                     await connection.send_multipart(response)
             case _, Subsystems.FILES.value, *rest:
-                if not chord_subsystem.is_ready():
-                    log.error("The Chord subsystem is not ready")
-                    await connection.send_multipart([b"NOT_READY"])
-                    return
                 log.info("The request is for the Files subsystem")
+                if not chord_subsystem.is_ready():
+                    log.error(
+                        "The Chord subsystem is not ready. So the request cannot proceed"
+                    )
+                    await connection.send_multipart([NOT_READY])
+                    return
+                await file_server.handle_request(
+                    connection=connection,
+                    initial_request=rest,
+                )
             case _, Subsystems.TAGS.value, *rest:
                 log.info("The request is for the Tags subsystem")
                 if not chord_subsystem.is_ready():
-                    log.error("The Chord subsystem is not ready")
-                    await connection.send_multipart([b"NOT_READY"])
+                    log.error(
+                        "The Chord subsystem is not ready. So the request cannot proceed"
+                    )
+                    await connection.send_multipart([NOT_READY])
                     return
+                await tag_server.handle_request(
+                    connection=connection,
+                    initial_request=rest,
+                )
             case _:
                 log.warning("The request is not for any subsystem")
+                log.warning(f"The request is => {request}")
         return
-    except BaseException as e:
-        log.exception(f"Error while handling the client:\n{e.with_traceback()}")
+    # except BaseException as e:
+    #     log.exception(f"Error while handling the client:\n{e.with_traceback()}")
+    except Exception as e:
+        log.error(f"An error occurred while handling the client =>\n{repr(e)}")
     finally:
         if connection:
             connection.close_connection()
@@ -166,8 +195,25 @@ async def start_server(port: int = 5700):
     )
     asyncio.create_task(chord_sub.run())
 
+    log.info("Creating the File Server subsystem")
+    file_server = FileServerSubsystem(
+        ip=ip,
+        port=port,
+        chord_node=chord_sub,
+        storage_directory=data_path / "file_server",
+    )
+
+    tag_server = TagServerSubsystem(
+        ip=ip,
+        port=port,
+        chord_node=chord_sub,
+        storage_directory=data_path / "tag_server",
+    )
+
     await asyncio.sleep(3)
     log.info("Chord Node created")
+    log.info("FileServer created")
+    log.info("TagServer created")
 
     log.info(f"Creating the server at => tcp://{ip}:{port}")
     server = AsyncServer(
@@ -176,8 +222,10 @@ async def start_server(port: int = 5700):
         handle_client_connection=lambda conn: handle_client(
             connection=conn,
             chord_subsystem=chord_sub,
+            file_server=file_server,
+            tag_server=tag_server,
         ),
-        max_connections=300,
+        max_connections=500,
     )
     log.info("Server created")
     await server.run_server()

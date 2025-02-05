@@ -123,11 +123,20 @@ class AsyncConnection:
 
     def close_connection(self):
         """This function close the connection"""
+        log = self.logger.bind(inside="close_connection")
+        log.info("Closing the connection")
         if self.connection_socket:
-            self.connection_socket.settimeout(0.5)
-            self.connection_socket.close()
-            self.connection_socket = None
-            self.address = None
+            try:
+                self.connection_socket.settimeout(0.5)
+                self.connection_socket.close()
+            except BaseException as e:
+                log.exception(
+                    f"An error occurred when closing the connection with socket"
+                )
+            finally:
+                self.address = None
+                self.connection_socket = None
+        log.info("Connection closed")
 
     async def _fill_recv_buffer(self):
         """Populate the receiving buffer"""
@@ -247,8 +256,11 @@ class AsyncConnection:
                         if not file_helper.valid_chunk_request(
                             offset=offset, chunk_size=size
                         ):
-                            await self.send_multipart(
-                                [FileOperations.INVALID_CHUNK.value]
+                            await asyncio.wait_for(
+                                self.send_multipart(
+                                    [FileOperations.INVALID_CHUNK.value]
+                                ),
+                                timeout=timeout,
                             )
                             return False, FailureOptions.BAD_REQUEST
 
@@ -266,9 +278,12 @@ class AsyncConnection:
                         log.warning(
                             f"Sending an {FileOperations.ERROR.value} message to the peer"
                         )
-                        self.send_multipart(
-                            [FileOperations.ERROR.value],
-                            b"Unknown instruction request received. Closing our connection",
+                        await asyncio.wait_for(
+                            self.send_multipart(
+                                [FileOperations.ERROR.value],
+                                b"Unknown instruction request received. Closing our connection",
+                            ),
+                            timeout=timeout,
                         )
                         log.warning(
                             f"Stopping the file upload because of this unknown instruction"
@@ -282,7 +297,9 @@ class AsyncConnection:
         except asyncio.CancelledError:
             log.info("The user wants to cancel the upload of the file.")
             log.debug("Sending a Cancel request to the connection peer")
-            await self.send_multipart([FileOperations.CANCELLED.value])
+            await asyncio.wait_for(
+                self.send_multipart([FileOperations.CANCELLED.value]), timeout=timeout
+            )
             log.debug("Peer received the message")
             raise
         except AsyncSocketDisconnected:
@@ -360,9 +377,15 @@ class AsyncConnection:
                     log.info(
                         "Sending a message to the peer that we detect an unknown request from them"
                     )
-                    await asyncio.wait_for(self.send_multipart([FileOperations.ERROR.value]), timeout=timeout)
+                    await asyncio.wait_for(
+                        self.send_multipart([FileOperations.ERROR.value]),
+                        timeout=timeout,
+                    )
                     log.info("Error message delivered successfully")
                     return False, FailureOptions.BAD_REQUEST
 
         log.info("All bytes from file where received")
+        log.info("Sending a message of download completed")
+        await self.send_multipart([FileOperations.COMPLETED.value])
+        log.info("Confirmation sended")
         return True, FailureOptions.UNKNOWN
