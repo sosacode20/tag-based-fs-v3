@@ -142,7 +142,7 @@ async def handle_client(
                 response = await chord_subsystem.handle_request(rest)
                 if response:
                     await connection.send_multipart(response)
-            case _, Subsystems.FILES.value, *rest:
+            case FROM, Subsystems.FILES.value, *rest:
                 log.info("The request is for the Files subsystem")
                 if not chord_subsystem.is_ready():
                     log.error(
@@ -153,6 +153,7 @@ async def handle_client(
                 await file_server.handle_request(
                     connection=connection,
                     initial_request=rest,
+                    from_peer_server=True if FROM == Subsystems.FILES.value else False,
                 )
             case _, Subsystems.TAGS.value, *rest:
                 log.info("The request is for the Tags subsystem")

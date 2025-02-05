@@ -39,7 +39,11 @@ class TagServerSubsystem:
         self.storage_dir: Path = storage_directory
         """The base folder for storing all the file server data"""
 
-    async def handle_request(self, connection: AsyncConnection, initial_request: list[bytes]) -> None:
+    async def handle_request(
+        self,
+        connection: AsyncConnection,
+        initial_request: list[bytes],
+    ) -> None:
         """
         Handles a request from a client
 

@@ -11,6 +11,7 @@ import os
 from service_discovery.service_watcher import ServiceWatcher, Peer
 from client_cli.commands.constants import Commands, CLIENT_SYSTEM, SERVER_SERVICE_NAME
 from client_cli.commands.send_file import send_files
+from client_cli.commands.download_file import download_files as down_files
 import asyncio
 import random as rnd
 
@@ -34,6 +35,7 @@ def get_default_log_filter() -> LogFilters:
             "delete_files",
             "list_files",
             "download_files",
+            "download_file",
             "add_tags",
             "delete_tags",
         ],
@@ -98,7 +100,7 @@ async def add_files(
 ):
     """Adds a list of files to the server with associated tags"""
     log = my_logger.bind(inside="add_files", files=file_names, tags=tags)
-    print("Inside add files")
+    # print("Inside add files")
     log.info(f"Trying to upload the files ({file_names}) with tags ({tags})")
 
     res = await send_files(
@@ -125,7 +127,8 @@ async def delete_files(
     ]
 ):
     """Deletes files from the server based on the tags"""
-    pass
+    log = my_logger.bind(inside="delete_files", tag_query=tag_query)
+    log.info(f"Trying to delete files with tags ({tag_query})")
 
 
 @app.command()
@@ -153,7 +156,21 @@ async def download_files(
     ]
 ):
     """Downloads files from the server based on the names of the files"""
-    pass
+    log = my_logger.bind(inside="download_files", files=file_names)
+    # print("Inside add files")
+    log.info(f"Trying to download the files ({file_names})")
+    res = await down_files(
+        file_names=file_names,
+        get_address=lambda: get_server_address(watcher, SERVER_SERVICE_NAME),
+        my_logger=log,
+        partial_download_folder=data_path / "partial_downloads",
+        received_files_folder=data_path / "received_files",
+        timeout=20,
+    )
+    if not res:
+        log.warning("The download files seems to be uncompleted")
+    else:
+        log.success("All files where downloaded successfully")
 
 
 @app.command()

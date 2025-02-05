@@ -18,3 +18,12 @@ async def list_files_with_tag_query(
 ):
     """List all the files with the given tag"""
     pass
+
+
+async def add_metadata_to_file(
+    connection: AsyncConnection,
+    file_meta: FileMetadata,
+    metadata_folder: Path,
+):
+    """Add metadata to a file"""
+    pass

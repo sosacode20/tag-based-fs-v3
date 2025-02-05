@@ -8,6 +8,7 @@ import uuid
 from typing import Annotated
 from pathlib import Path
 from typing import Optional
+from loguru import logger
 
 
 def get_base_path() -> Path:
@@ -49,6 +50,11 @@ app = App(
     help="A CLI app for interacting with the podman service and for easily creation of container with bindings",
     version="0.1.0",
 )
+
+client_app = App(
+    name="client", help="A CLI app for interacting with the server file system"
+)
+app.command(client_app)
 
 
 @app.command(name="create-discovery-test-node")
@@ -213,6 +219,204 @@ def create_storage_server():
         # command=["python", "./code/main.py"],
     )
     print(f"Container {container.name} created")
+
+
+# @app.command()
+def create_client(
+    args: list[str],
+):
+    """Creates the client for the tag based filesystem"""
+    image_name = "distributed_python:basic"
+    base_path = get_base_path()
+    id = uuid.uuid4().hex
+    container_name: str = f"client_{id}"
+    bindings = [
+        *get_basic_bindings(),
+        (
+            get_data_folder(container_name),
+            Path("/app/data"),
+        ),
+        (
+            base_path / "client_cli",
+            Path("/app/code") / "client_cli",
+        ),
+        (
+            get_data_folder() / "files_to_send",
+            Path("/app/files_to_send"),
+        ),
+    ]
+    bindings = transform_bindings(bindings)
+    env_vars = {
+        "DATA_FOLDER": "/app/data",
+    }
+    container = run_container(
+        container_name=container_name,
+        image_name=image_name,
+        bindings=bindings,
+        network="servers",
+        environment=env_vars,
+        command=[
+            "python",
+            "/app/code/client_cli/cli_app.py",
+            *args,
+        ],
+        # command=["python", "./code/main.py"],
+    )
+    print(f"Container {container.name} created")
+
+
+@client_app.command(name="add-files")
+def client_add_files(
+    file_names: Annotated[
+        list[str],
+        Parameter(
+            name="files",
+            consume_multiple=True,
+        ),
+    ],
+    tags: Annotated[
+        list[str],
+        Parameter(
+            consume_multiple=True,
+        ),
+    ],
+):
+    """
+    Adds files to the server annotated with the tags
+    """
+    logger.info(f"Adding files ({file_names}) with tags ({tags})")
+    create_client(
+        [
+            "add-files",
+            "--files",
+            *file_names,
+            "--tags",
+            *tags,
+        ]
+    )
+
+
+@client_app.command(name="download-files")
+def client_download_files(
+    file_names: Annotated[
+        list[str],
+        Parameter(
+            name="--files",
+            consume_multiple=True,
+        ),
+    ],
+):
+    """
+    Downloads files from the server
+    """
+    create_client(
+        [
+            "download-files",
+            "--files",
+            *file_names,
+        ]
+    )
+
+
+@client_app.command()
+def client_list_files(
+    tag_query: Annotated[
+        list[str],
+        Parameter(
+            name="--tag-query",
+            consume_multiple=True,
+        ),
+    ],
+):
+    """
+    Lists files from the server based on the tags
+    """
+    create_client(
+        [
+            "list-files",
+            "--tag-query",
+            *tag_query,
+        ]
+    )
+
+
+@client_app.command()
+def client_delete_files(
+    tag_query: Annotated[
+        list[str],
+        Parameter(
+            name="--tag-query",
+            consume_multiple=True,
+        ),
+    ],
+):
+    """
+    Deletes files from the server
+    """
+    create_client(
+        [
+            "delete-files",
+            "--tag-query",
+            *tag_query,
+        ]
+    )
+
+
+@client_app.command()
+def add_tags(
+    tag_query: Annotated[
+        list[str],
+        Parameter(
+            name="--tag-query",
+            consume_multiple=True,
+        ),
+    ],
+    tag_list: Annotated[
+        list[str],
+        Parameter(
+            name="--tag-list",
+            consume_multiple=True,
+        ),
+    ],
+):
+    """Adds tags to files based on the tag query"""
+    create_client(
+        [
+            "add-tags",
+            "--tag-query",
+            *tag_query,
+            "--tag-list" * tag_list,
+        ]
+    )
+
+
+@client_app.command()
+def delete_tags(
+    tag_query: Annotated[
+        list[str],
+        Parameter(
+            name="--tag-query",
+            consume_multiple=True,
+        ),
+    ],
+    tag_list: Annotated[
+        list[str],
+        Parameter(
+            name="--tag-list",
+            consume_multiple=True,
+        ),
+    ],
+):
+    """Deletes tags from files based on the tag query"""
+    create_client(
+        [
+            "delete-tags",
+            "--tag-query",
+            *tag_query,
+            "--tag-list",
+            *tag_list,
+        ]
+    )
 
 
 if __name__ == "__main__":

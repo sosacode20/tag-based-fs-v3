@@ -31,24 +31,21 @@ async def send_files(
     log.info(f"Starting the `sending files` operation")
 
     for file_name in file_names:
-        try:
-            log.info("Getting a file server address")
-            address = await get_address()
-            if not address:
-                log.error("No server found. Exiting app")
-                return False
-            to_ip, to_port = address
-            log.info(f"Server found at {to_ip}:{to_port} => {gethostbyaddr(to_ip)}")
-            log.info("Starting the operation")
 
-            log.info(f"Creating the client at address => {to_ip}:{to_port}")
-            client = await create_client(to_ip=to_ip, to_port=to_port, my_logger=log)
-        except BaseException as e:
-            log.error(f"An error occurred while creating the client => {repr(e)}")
+        log.info("Getting a file server address")
+        address = await get_address()
+        if not address:
+            log.error("No server found. Exiting app")
             return False
+        to_ip, to_port = address
+        log.info(f"Server found at {to_ip}:{to_port} => {gethostbyaddr(to_ip)}")
+        log.info("Starting the operation")
+
         try:
             await send_file(
-                client=client,
+                # client=client,
+                to_ip=to_ip,
+                to_port=to_port,
                 files_directory=files_directory,
                 file_name=file_name,
                 tags=tags,
@@ -60,17 +57,15 @@ async def send_files(
             log.error("User pressed CTRL+C and CLI is stopping")
         except Exception as e:
             log.error(f"An unknown exception occur =>\n{repr(e)}")
-        finally:
-            log.info("Closing connection with server")
-            client.close_connection()
-            log.info("Connection closed")
 
     log.info("All files has been sended")
     return True
 
 
 async def send_file(
-    client: AsyncConnection,
+    # client: AsyncConnection,
+    to_ip: str,
+    to_port: int,
     files_directory: Path,
     file_name: str,
     tags: list[str],
@@ -85,6 +80,15 @@ async def send_file(
     if not file_path.exists():
         # print(f"The file at path {str(file_path)} doesn't exist")
         log.warning(f"The file at path {str(file_path)} doesn't exist")
+        return False
+    try:
+        log.info("Creating the client")
+        client = await create_client(to_ip, to_port, my_logger=my_logger)
+        log.success(
+            f"Client created at tcp://{to_ip}:{to_port} => {gethostbyaddr(to_ip)}"
+        )
+    except Exception as e:
+        log.error(f"An error occur while creating the client => {repr(e)}")
         return False
     file_helper: FileHelper = FileHelper(file_path=file_path)
     file_metadata: FileMetadata = file_helper.get_metadata()
@@ -106,21 +110,37 @@ async def send_file(
         client.recv_multipart(),
         timeout=timeout,
     )
-    log.info(f"Received response from server => {response}")
+    log.debug(f"Received response from server => {response}")
 
     match response:
+        case b"REDIRECTION", ip, port:
+            ip = ip.decode()
+            port = int.from_bytes(port)
+            log.info(f"Client will be redirected to {ip}:{port} => {gethostbyaddr(ip)}")
+            return await send_file(
+                # client=client,
+                to_ip=ip,
+                to_port=port,
+                files_directory=files_directory,
+                file_name=file_name,
+                tags=tags,
+                my_logger=my_logger,
+                timeout=timeout,
+            )
         case b"OK",:
             log.info("The server wants the file")
             log.info("Sending the file")
             await client.send_file(file_helper=file_helper, timeout=timeout)
             log.info("File sended")
-            return
+            return True
         case b"NOT_READY",:
             log.warning(
                 "The server is not ready to accept the file. Wait for some time and try again"
             )
+            return False
         case b"NOT_ALLOWED":
             log.warning("The server doesn't want the file")
+            return False
         case _:
             log.warning("The server don't allow the file upload")
-            return
+            return False

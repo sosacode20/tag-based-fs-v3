@@ -73,6 +73,21 @@ class FileMetadata(BaseModel):
         """Create an instance of the class from a JSON string"""
         return cls.model_validate_json(json_str)
 
+    def __eq__(self, value):
+        if isinstance(value, FileMetadata):
+            return (
+                self.name == value.name
+                and self.size == value.size
+                and self.checksum == value.checksum
+            )
+        return False
+
+    def __ne__(self, value):
+        return not self.__eq__(value)
+
+    def __hash__(self):
+        return int(hashlib.sha1(self.name.encode()).hexdigest(), 16)
+
 
 class FileHelper(object):
     """This class is a helper for obtaining chunks of a file. Also, for obtaining metadata of the same"""
