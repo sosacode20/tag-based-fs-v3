@@ -127,6 +127,11 @@ async def send_file(
                 my_logger=my_logger,
                 timeout=timeout,
             )
+        case b"ALREADY_EXISTS":
+            log.success(
+                "The server has this exact same version of the file. So no need to uploaded again"
+            )
+            return True
         case b"OK",:
             log.info("The server wants the file")
             log.info("Sending the file")

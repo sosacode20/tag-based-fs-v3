@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from file_helpers.file_helper import FileMetadata
 from chord_subsystem.chord_interface import getShaRepr, in_between
-from typing import Optional
+from typing import Optional, Self
 from pathlib import Path
 import aiofiles
 
@@ -41,6 +41,12 @@ class FileServerFilesMeta(BaseModel):
                 return file
         return None
 
+    def has_file(self, file_meta: FileMetadata) -> bool:
+        """
+        True if the file exists in the database
+        """
+        return file_meta in self.files
+
     def get_files_in_and_out_range(
         self,
         range: tuple[int, int],
@@ -51,8 +57,8 @@ class FileServerFilesMeta(BaseModel):
         :param range: The range to get the files from. The range is in the form (start, end]
         :return: A tuple of two lists. The first list contains all the files in the range, the second list contains all the files outside the range
         """
-        in_range = []
-        out_range = []
+        in_range: list[FileMetadata] = []
+        out_range: list[FileMetadata] = []
         for file in self.files:
             if in_between(file.file_id, range):
                 in_range.append(file)

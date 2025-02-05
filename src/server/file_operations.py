@@ -9,8 +9,26 @@ from file_helpers.file_helper import FileMetadata, FileHelper
 from server_constants import Commands
 import json
 import asyncio
+from server.server_metadata_clases.file_server_metadata import FileServerFilesMeta
+import socket
+from socket import gethostbyaddr
 
 my_logger = logger.bind(where="file_operations")
+
+
+async def create_client(to_ip: str, to_port: int, my_logger: Logger) -> AsyncConnection:
+    """Create an AsyncConnection that serves as a client connecting to a server"""
+    log = my_logger.bind(inside="create_client", to_ip=to_ip, to_port=to_port)
+    log.info("Creating the client")
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.setblocking(False)
+    address = (to_ip, to_port)
+    log.info("Connecting to server")
+    # client_socket.connect(address)
+    loop = asyncio.get_running_loop()
+    await loop.sock_connect(client_socket, address=address)
+    log.info("Connection Successful")
+    return AsyncConnection(connection_socket=client_socket, address=address)
 
 
 # async def proxy(start_connection: AsyncConnection, end_connection)
@@ -20,6 +38,7 @@ async def handle_file_upload_to_server(
     connection: AsyncConnection,
     file_meta: FileMetadata,
     # tags: list[str],
+    # files_database: FileServerFilesMeta,
     partial_downloads_folder: Path,
     received_files_folder: Path,
 ):
@@ -28,6 +47,7 @@ async def handle_file_upload_to_server(
     The server uses the `recv_file` functionality of the `AsyncSockets`"""
     log = my_logger.bind(inside="handle_file_upload_to_server")
     log.info(f"Handling an upload request for file ({file_meta.name})")
+
     file_download_helper: FileDownloadHelper = FileDownloadHelper(
         file_name=file_meta.name,
         storage_directory=partial_downloads_folder,
@@ -92,16 +112,96 @@ async def handle_file_download_from_server(
     return True
 
 
-async def send_file_to_peer_server(
-    ip: str,
-    port: int,
-    file_name: str,
-    tags: list[str],
+async def server_send_file(
+    # client: AsyncConnection,
+    to_ip: str,
+    to_port: int,
+    files_directory: Path,
+    # file_name: str,
+    file_meta: FileMetadata,
+    my_logger: Logger,
+    tags: list[str] = [],
+    timeout=20,
 ):
-    """Send a file with tags to a peer server.
+    log = my_logger.bind(inside="server_send_file", file_name=file_meta.name, tags=tags)
+    log.info(
+        f"Trying to send a file with name ({file_meta.name}) and tags({tags}) to the server"
+    )
+    file_path = files_directory / file_meta.name
+    if not file_path.exists():
+        # print(f"The file at path {str(file_path)} doesn't exist")
+        log.warning(f"The file at path {str(file_path)} doesn't exist")
+        return False
+    try:
+        log.info("Creating the client")
+        client = await create_client(to_ip, to_port, my_logger=my_logger)
+        log.success(
+            f"Client created at tcp://{to_ip}:{to_port} => {gethostbyaddr(to_ip)}"
+        )
+    except Exception as e:
+        log.error(f"An error occur while creating the client => {repr(e)}")
+        return False
+    file_helper: FileHelper = FileHelper(file_path=file_path)
+    # file_metadata: FileMetadata = file_helper.get_metadata()
+    log.info(f"Sending the headers of the file to upload")
+    await asyncio.wait_for(
+        client.send_multipart(
+            message=[
+                b"FILES",
+                b"FILES",
+                Commands.UPLOAD.value,
+                file_meta.to_json().encode(),
+                json.dumps(tags).encode(),
+            ]
+        ),
+        timeout=timeout,
+    )
+    log.info("Waiting for server to accept the file")
+    response = await asyncio.wait_for(
+        client.recv_multipart(),
+        timeout=timeout,
+    )
+    log.debug(f"Received response from server => {response}")
 
-    The peer server will be considered a replica"""
-    pass
+    match response:
+        case b"REDIRECTION", ip, port:
+            ip = ip.decode()
+            port = int.from_bytes(port)
+            log.info(f"Client will be redirected to {ip}:{port} => {gethostbyaddr(ip)}")
+            log.warning("This redirection SHOULD NOT be happening")
+            return await server_send_file(
+                # client=client,
+                to_ip=ip,
+                to_port=port,
+                files_directory=files_directory,
+                # file_name=file_name,
+                file_meta=file_meta,
+                tags=tags,
+                my_logger=my_logger,
+                timeout=timeout,
+            )
+        case b"ALREADY_EXISTS":
+            log.success(
+                "The server has this exact same version of the file. So no need to uploaded again"
+            )
+            return True
+        case b"OK",:
+            log.info("The server wants the file")
+            log.info("Sending the file")
+            await client.send_file(file_helper=file_helper, timeout=timeout)
+            log.info("File sended")
+            return True
+        case b"NOT_READY",:
+            log.warning(
+                "The server is not ready to accept the file. Wait for some time and try again"
+            )
+            return False
+        case b"NOT_ALLOWED":
+            log.warning("The server doesn't want the file")
+            return False
+        case _:
+            log.warning("The server don't allow the file upload")
+            return False
 
 
 # async def get_file_tags(
