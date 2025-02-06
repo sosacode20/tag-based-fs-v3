@@ -38,7 +38,7 @@ def get_default_filter() -> LogFilters:
     filter.add_filter(
         where="ChordNode",
         inside=[
-            # "where_to_join",
+            "where_to_join",
             # "join",
             "stabilize",
             # "notify",
@@ -57,31 +57,34 @@ def get_default_filter() -> LogFilters:
     #         "start_server",
     #     ],
     # )
-    # filter.add_filter(
-    #     where="SuccessorList",
-    #     inside=[
-    #         "add",
-    #         "get_successor",
-    #         "get_pred_and_successors",
-    #         "get_first_alive_successor",
-    #         "update",
-    #     ],
-    # )
+    filter.add_filter(
+        where="SuccessorList",
+        inside=[
+            # "add",
+            # "get_successor",
+            # "get_pred_and_successors",
+            "get_first_alive_successor",
+            "update",
+        ],
+    )
     filter.add_filter(
         where="FileServerSubsystem",
         inside=[
-            "handle_request",
+            # "handle_request",
             "handle_upload",
             "successors_replication",
             "replicate_files_with_successor",
+            "server_send_file",
+
         ],
     )
-    filter.add_filter(
-        where="file_operations",
-        inside=[
-            "handle_file_upload_to_server",
-        ],
-    )
+    # filter.add_filter(
+    #     where="file_operations",
+    #     inside=[
+    #         "handle_file_upload_to_server",
+    #         "server_send_file",
+    #     ],
+    # )
     return filter
 
 
@@ -146,12 +149,12 @@ async def handle_client(
                     await connection.send_multipart(response)
             case FROM, Subsystems.FILES.value, *rest:
                 log.info("The request is for the Files subsystem")
-                if not chord_subsystem.is_ready():
-                    log.error(
-                        "The Chord subsystem is not ready. So the request cannot proceed"
-                    )
-                    await connection.send_multipart([NOT_READY])
-                    return
+                # if not chord_subsystem.is_ready():
+                #     log.error(
+                #         "The Chord subsystem is not ready. So the request cannot proceed"
+                #     )
+                #     await connection.send_multipart([NOT_READY])
+                #     return
                 await file_server.handle_request(
                     connection=connection,
                     initial_request=rest,
@@ -159,12 +162,12 @@ async def handle_client(
                 )
             case _, Subsystems.TAGS.value, *rest:
                 log.info("The request is for the Tags subsystem")
-                if not chord_subsystem.is_ready():
-                    log.error(
-                        "The Chord subsystem is not ready. So the request cannot proceed"
-                    )
-                    await connection.send_multipart([NOT_READY])
-                    return
+                # if not chord_subsystem.is_ready():
+                #     log.error(
+                #         "The Chord subsystem is not ready. So the request cannot proceed"
+                #     )
+                #     await connection.send_multipart([NOT_READY])
+                #     return
                 await tag_server.handle_request(
                     connection=connection,
                     initial_request=rest,

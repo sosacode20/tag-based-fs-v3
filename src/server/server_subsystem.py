@@ -83,14 +83,16 @@ class FileServerSubsystem:
         my_files, _ = self.my_files.get_files_in_and_out_range(my_range)
         log.info(f"Sending the files to the successor")
         for file in my_files:
+            log.success(f"Replicating file {file.name} to node {gethostbyaddr(ip)}")
             await server_send_file(
                 to_ip=ip,
                 to_port=port,
                 files_directory=self.storage_dir / FILES_RECEIVED_FOLDER,
                 file_meta=file,
-                my_logger=log,
+                my_logger=self.logger,
                 tags=[],
             )
+            log.success("file sended")
         log.success("All the files have been sent to the successor")
 
     async def successors_replication(self):
@@ -101,64 +103,71 @@ class FileServerSubsystem:
         task2: Optional[asyncio.Task] = None
         successors: list[ChordInterface] = []
         while True:
-            log.info("Starting the task of replicating to successors")
-            if not self.chord_node.is_ready():
-                log.warning("ChordNode is not ready yet. Waiting 3 seconds")
-                await asyncio.sleep(3)
-                continue
-            log.success("ChordNode is ready. Checking the successors")
-            new_successors = await self.chord_node.get_successors(
-                length=3
-            )  # It will always give 2 nodes (design choice)
-            if not same_chord_nodes(successors, new_successors):
-                log.info("The successors have changed")
-                successors = new_successors
-                if task1:
-                    task1.cancel()
-                if task2:
-                    task2.cancel()
-                task1 = asyncio.create_task(
-                    self.replicate_files_with_successor(
-                        ip=successors[0].ip,
-                        port=successors[0].port,
+            try:
+                log.info("Starting the task of replicating to successors")
+                # if not self.chord_node.is_ready():
+                #     log.warning("ChordNode is not ready yet. Waiting 3 seconds")
+                #     await asyncio.sleep(3)
+                #     continue
+                log.success("ChordNode is ready. Checking the successors")
+                new_successors = await self.chord_node.get_successors(
+                    length=3
+                )  # It will always give 2 nodes (design choice)
+                log.debug(f"The new successors for replicating are => {new_successors}")
+                if not same_chord_nodes(successors, new_successors):
+                    log.info("The successors have changed")
+                    successors = new_successors
+                    # if task1:
+                    #     task1.cancel()
+                    # if task2:
+                    #     task2.cancel()
+                    if len(successors) >= 1:
+                        task1 = asyncio.create_task(
+                            self.replicate_files_with_successor(
+                                ip=successors[0].ip,
+                                port=successors[0].port,
+                            )
+                        )
+                    if len(successors) >= 2:
+                        task2 = asyncio.create_task(
+                            self.replicate_files_with_successor(
+                                ip=successors[1].ip,
+                                port=successors[1].port,
+                            )
+                        )
+                elif (not task1 or task1.done()) and len(successors) >= 1:
+                    log.info(
+                        "The 1st successor have not changed. But we need to check if we can re-synchronize"
                     )
-                )
-                task2 = asyncio.create_task(
-                    self.replicate_files_with_successor(
-                        ip=successors[1].ip,
-                        port=successors[1].port,
+                    successor = successors[0]
+                    log.success(
+                        f"Starting the synchronization with 1st successor at tcp://{successor.ip}:{successor.port} => {gethostbyaddr(successor.ip)}"
                     )
-                )
-            elif not task1 or task1.done():
-                log.info(
-                    "The 1st successor have not changed. But we need to check if we can re-synchronize"
-                )
-                successor = successors[0]
-                log.success(
-                    f"Starting the synchronization with 1st successor at tcp://{successor.ip}:{successor.port} => {gethostbyaddr(successor.ip)}"
-                )
-                task1 = asyncio.create_task(
-                    self.replicate_files_with_successor(
-                        ip=successor.ip,
-                        port=successor.port,
+                    task1 = asyncio.create_task(
+                        self.replicate_files_with_successor(
+                            ip=successor.ip,
+                            port=successor.port,
+                        )
                     )
-                )
-            elif not task2 or task2.done():
-                log.info(
-                    "The 2nd successor have not changed. But But we need to check if we can re-synchronize"
-                )
-                successor2 = successors[0]
-                log.success(
-                    f"Starting the synchronization with 2nd successor at tcp://{successor2.ip}:{successor2.port} => {gethostbyaddr(successor.ip)}"
-                )
-                task2 = asyncio.create_task(
-                    self.replicate_files_with_successor(
-                        ip=successor2.ip,
-                        port=successor2.port,
+                elif (not task2 or task2.done()) and len(successors) >= 2:
+                    log.info(
+                        "The 2nd successor have not changed. But But we need to check if we can re-synchronize"
                     )
-                )
-            else:
-                log.info("The successors have not changed. Waiting 3 seconds")
+                    successor2 = successors[1]
+                    log.success(
+                        f"Starting the synchronization with 2nd successor at tcp://{successor2.ip}:{successor2.port} => {gethostbyaddr(successor.ip)}"
+                    )
+                    task2 = asyncio.create_task(
+                        self.replicate_files_with_successor(
+                            ip=successor2.ip,
+                            port=successor2.port,
+                        )
+                    )
+                else:
+                    log.info("The successors have not changed. Waiting 3 seconds")
+            except:
+                pass
+            finally:
                 await asyncio.sleep(3)
 
     async def am_responsible(self, file_name: str) -> tuple[bool, int, tuple[int, int]]:
@@ -255,7 +264,7 @@ class FileServerSubsystem:
                 connection=connection,
                 file_meta=file_meta,
                 # tags=tags,
-                files_database=self.my_files,
+                # files_database=self.my_files,
                 partial_downloads_folder=self.storage_dir / PARTIAL_DOWN_FOLDER,
                 received_files_folder=self.storage_dir / FILES_RECEIVED_FOLDER,
             )

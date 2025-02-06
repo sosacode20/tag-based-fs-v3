@@ -180,7 +180,7 @@ async def server_send_file(
                 my_logger=my_logger,
                 timeout=timeout,
             )
-        case b"ALREADY_EXISTS":
+        case b"ALREADY_EXISTS",:
             log.success(
                 "The server has this exact same version of the file. So no need to uploaded again"
             )
@@ -200,7 +200,7 @@ async def server_send_file(
             log.warning("The server doesn't want the file")
             return False
         case _:
-            log.warning("The server don't allow the file upload")
+            log.warning(f"The server don't allow the file upload => ({response})")
             return False
 
 

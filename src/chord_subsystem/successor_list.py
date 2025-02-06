@@ -70,7 +70,7 @@ class SuccessorList:
         length = max(0, min(length, len(self.list) - 1))
         res = self.list[:length]
         log.bind(list=res).debug(f"Returning the first {length} successors => {res}")
-        return self.list[:length]
+        return res
 
     async def get_successor(self) -> ChordInterface:
         """
@@ -198,6 +198,7 @@ class SuccessorList:
         first_node = await self.get_first_alive_successor()
         if not first_node:
             log.info("There is no alive node in the successor list")
+            self.list = []
             return
         log.debug(f"The first alive node is {first_node}")
         log.debug(f"Asking for the predecessor and successors of node {first_node}")
